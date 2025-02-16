@@ -1,1 +1,236 @@
+<!-- 管理端完整代码 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>乳腺癌模型管理</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --danger: #e74c3c;
+        }
 
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 15px;
+            background: #f5f5f5;
+        }
+
+        .factor-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        input[type="text"], 
+        input[type="number"],
+        select {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .button-group {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .add-btn { background: var(--secondary); color: white; }
+        .del-btn { background: var(--danger); color: white; }
+        .save-btn { background: #27ae60; color: white; }
+    </style>
+</head>
+<body>
+    <h2 style="margin:0 0 20px 0;">风险因素管理</h2>
+    <div id="factorContainer"></div>
+    
+    <div class="button-group">
+        <button onclick="addNewFactor()" class="add-btn">+ 新建</button>
+        <button onclick="saveConfig()" class="save-btn">保存</button>
+    </div>
+
+<script>
+// 初始化配置（包含核心模型）
+let factors = JSON.parse(localStorage.getItem('BC_RiskFactors')) || [
+    {
+        id: 'age',
+        name: '当前年龄',
+        type: 'number',
+        min: 20,
+        max: 100
+    },
+    {
+        id: 'menarche_age',
+        name: '初潮年龄',
+        type: 'select',
+        options: [
+            {label: '≥15岁', rr: 1.0},
+            {label: '13-14岁', rr: 1.1},
+            {label: '12-13岁', rr: 1.3},
+            {label: '<12岁', rr: 1.5}
+        ]
+    },
+    {
+        id: 'first_child_age',
+        name: '首次生育年龄',
+        type: 'select',
+        options: [
+            {label: '≤20岁', rr: 1.0},
+            {label: '20-24岁', rr: 1.2},
+            {label: '25-29岁', rr: 1.4},
+            {label: '≥30岁', rr: 1.6}
+        ]
+    }
+];
+
+function renderFactors() {
+    const container = document.getElementById('factorContainer');
+    container.innerHTML = factors.map((factor, index) => `
+        <div class="factor-panel">
+            <div class="input-row">
+                <input type="text" value="${factor.name}" 
+                    onchange="updateFactor(${index}, 'name', this.value)"
+                    placeholder="因素名称">
+                <select onchange="updateFactor(${index}, 'type', this.value)">
+                    <option value="number" ${factor.type === 'number' ? 'selected' : ''}>数字</option>
+                    <option value="select" ${factor.type === 'select' ? 'selected' : ''}>选项</option>
+                </select>
+            </div>
+            
+            ${factor.type === 'select' ? `
+                <div id="options_${index}">
+                    ${factor.options.map((opt, oIndex) => `
+                        <div class="input-row">
+                            <input type="text" value="${opt.label}" 
+                                onchange="updateOption(${index}, ${oIndex}, 'label', this.value)">
+                            <input type="number" step="0.1" value="${opt.rr}"
+                                onchange="updateOption(${index}, ${oIndex}, 'rr', this.value)">
+                            <button class="del-btn" 
+                                onclick="removeOption(${index}, ${oIndex})">×</button>
+                        </div>
+                    `).join('')}
+                </div>
+                <button class="add-btn" onclick="addOption(${index})" style="width:100%;margin-top:10px;">+ 添加选项</button>
+            ` : ''}
+            
+            <button class="del-btn" onclick="removeFactor(${index})" style="width:100%;margin-top:10px;">删除因素</button>
+        </div>
+    `).join('');
+}
+
+function addNewFactor() {
+    factors.push({
+        id: `factor_${Date.now()}`,
+        name: '新风险因素',
+        type: 'select',
+        options: [{label: '选项1', rr: 1.0}]
+    });
+    renderFactors();
+}
+
+function updateFactor(index, field, value) {
+    factors[index][field] = value;
+    if(field === 'type' && value === 'number') {
+        factors[index].options = [];
+    }
+    renderFactors();
+}
+
+function updateOption(fIndex, oIndex, field, value) {
+    factors[fIndex].options[oIndex][field] = value;
+}
+
+function addOption(index) {
+    factors[index].options.push({label: '新选项', rr: 1.0});
+    renderFactors();
+}
+
+function removeOption(fIndex, oIndex) {
+    factors[fIndex].options.splice(oIndex, 1);
+    renderFactors();
+}
+
+function removeFactor(index) {
+    if(confirm('确定要删除这个风险因素吗？')) {
+        factors.splice(index, 1);
+        renderFactors();
+    }
+}
+
+function saveConfig() {
+    localStorage.setItem('BC_RiskFactors', JSON.stringify(factors));
+    alert('配置已保存！');
+    renderFactors();
+}
+
+// 初始化渲染
+renderFactors();
+</script>
+<!-- 新增数据导出功能 -->
+<script>
+function exportData() {
+    const data = [];
+    for(let i=0; i<localStorage.length; i++){
+        const key = localStorage.key(i);
+        if(key.startsWith('BC_RiskFactors') || key.startsWith('BC_Case_')) {
+            data.push({
+                key: key,
+                value: localStorage.getItem(key)
+            });
+        }
+    }
+    
+    const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `breast_cancer_data_${new Date().toISOString()}.json`;
+    a.click();
+}
+
+function importData(event) {
+    const file = event.target.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        const data = JSON.parse(e.target.result);
+        data.forEach(item => {
+            localStorage.setItem(item.key, item.value);
+        });
+        alert('数据导入成功！');
+        location.reload();
+    };
+    
+    reader.readAsText(file);
+}
+</script>
+</body>
+</html>
